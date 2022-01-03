@@ -5,11 +5,16 @@
 
 %% Initial conditions and constants
 % Generate the cube mesh
-d = 1:5;
+d = -2:2;
 [X, Y, Z] = meshgrid(d);
 x = X(:);
 y = Y(:);
 z = Z(:);
+
+P1 = [0 -2 0].'; 
+P2 = [1 2 -1].';
+[D, P3, P4] = cube_distance(P1, P2, (length(d)-1)/2);
+[D, P5, P6] = cube_distance(P4, P2, (length(d)-1)/2);
 
 % Delaunay triangulation
 DT = delaunayTriangulation(x,y,z);
@@ -20,6 +25,23 @@ T = triangulation(Tfb, Xfb);
 mesh.AdjencyMatrix = adjency_matrix(T);
 mesh.Points = T.Points;
 mesh.ConnectivityList = T.ConnectivityList;
+%%
+figure('Name','Cube 3D mesh','NumberTitle','off')
+view(3)
+hold on 
+trisurf(T,'FaceColor',[0.8 0.8 1.0]);
+alpha(0.1)
+scatter3(P1(1), P1(2), P1(3), 'b', 'filled');
+scatter3(P2(1), P2(2), P2(3), 'r', 'filled');
+scatter3(P3(1,:), P3(2,:), P3(3,:), 'k', 'filled');
+scatter3(P4(1,:), P4(2,:), P4(3,:), 'k', 'filled');
+scatter3(P5(1,:), P5(2,:), P5(3,:), 'k', 'filled');
+scatter3(P6(1,:), P6(2,:), P6(3,:), 'k', 'filled');
+hold off
+xlabel('x','FontSize',13);
+ylabel('y','FontSize',13);
+zlabel('z','FontSize',13);
+title('Cube 3D mesh','FontSize',13)
 
 %% Optimization problem
 % Design constraints 
@@ -45,7 +67,11 @@ hold on
 trisurf(T,'FaceColor',[0.8 0.8 1.0]);
 alpha(0.1)
 scatter3(source(1), source(2), source(3), 'k', 'filled')
-scatter3(wire(2:end,1), wire(2:end,2), wire(2:end,3), 'b','filled')
+%scatter3(wire(2:end,1), wire(2:end,2), wire(2:end,3), 'b','filled')
+scatter(P1(1), P1(2), P1(3));
+scatter(P2(1), P2(2), P2(3));
+scatter(P3(1,:), P3(2,:), P3(3,:));
+scatter(P4(1,:), P4(2,:), P4(3,:));
 scatter3(destination(1), destination(2), destination(3), 'r','filled')
 hold off
 xlabel('x','FontSize',13);
@@ -166,6 +192,54 @@ function [path, cost, source, destination] = Astar_algorithm(mesh, params)
     destination = mesh.Points(destination,:);
 end
 
+% Function to cube the taxicab distance between any two points on the cube's surface
+function [d, P3, P4] = cube_distance(P1, P2, L)
+    % Check if they are on the same face computing how many components are different
+    index(1,:) = abs(P1) == L;
+    index(2,:) = abs(P2) == L;
+    
+    I = eye(3);
+    N(:,1) = sign(P1(index(1,:)))*I(:,index(1,:));
+    N(:,2) = sign(P2(index(2,:)))*I(:,index(2,:));
+
+    if ((dot(N(:,1),N(:,2)) == 0) || (dot(N(:,1),N(:,2)) == -1))
+        % Compute the intersection between the edges and the unfolding point
+        plane = (abs(P1) ~= L);
+
+        P3 = repmat(P1,1,4);
+        k = 1; 
+        for i = 1:length(plane)
+            if (plane(i))
+                P3(i,k) = L; 
+                P3(i,k+2) = -L;
+                k = k+1;
+            end
+        end
+
+        % Check if the edge shares surface with the destination
+        new_index = abs(P3(plane,:)) == L;
+
+        if (any(index(3,:) == index(2,:)))
+            d = sum(abs(P2-P3(:,index(3,:) == index(2,:))));
+        else
+            P4 = P3; 
+            P4(~plane,:) = P4(~plane,:)-sign(P4(~plane,:))*1;
+
+            dmin = zeros(1,size(P3,2)); 
+            for i = 1:size(P3,2)
+                dmin(i) = 1 +sum(abs(P3(:,i)-P1)); 
+            end
+
+            [dmin, index] = min(dmin);
+            P4 = P4(:,index(1));
+            d = dmin + cube_distance(P4(:,index(1)), P2, L);
+        end
+    else
+        d = sum(abs(P2-P1));        % Taxicab distance betweeen two points on the same surface
+        P3 = P1; 
+        P4 = P2;
+    end
+end
 
 % Function to optimize the problem 
 function [wire, A, S, dP, psi] = conformalOptimization(mesh, gamma, num_nodes, params, method)
