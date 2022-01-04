@@ -11,10 +11,9 @@ x = X(:);
 y = Y(:);
 z = Z(:);
 
-P1 = [0 -2 0].'; 
-P2 = [1 2 -1].';
+P1 = [-2 0 0].'; 
+P2 = [-2 2 2].';
 [D, P3, P4] = cube_distance(P1, P2, (length(d)-1)/2);
-[D, P5, P6] = cube_distance(P4, P2, (length(d)-1)/2);
 
 % Delaunay triangulation
 DT = delaunayTriangulation(x,y,z);
@@ -25,7 +24,7 @@ T = triangulation(Tfb, Xfb);
 mesh.AdjencyMatrix = adjency_matrix(T);
 mesh.Points = T.Points;
 mesh.ConnectivityList = T.ConnectivityList;
-%%
+
 figure('Name','Cube 3D mesh','NumberTitle','off')
 view(3)
 hold on 
@@ -34,9 +33,7 @@ alpha(0.1)
 scatter3(P1(1), P1(2), P1(3), 'b', 'filled');
 scatter3(P2(1), P2(2), P2(3), 'r', 'filled');
 scatter3(P3(1,:), P3(2,:), P3(3,:), 'k', 'filled');
-scatter3(P4(1,:), P4(2,:), P4(3,:), 'k', 'filled');
-scatter3(P5(1,:), P5(2,:), P5(3,:), 'k', 'filled');
-scatter3(P6(1,:), P6(2,:), P6(3,:), 'k', 'filled');
+scatter3(P4(1,:), P4(2,:), P4(3,:), 'm', 'filled');
 hold off
 xlabel('x','FontSize',13);
 ylabel('y','FontSize',13);
@@ -58,7 +55,7 @@ tol = 1;      % Continuity tolerance
 params = [L dphi W tol];    
 
 % Optimization 
-[wire, cost, source, destination] = Astar_algorithm(mesh, params);
+[wire, cost, source, destination] = Astar_algorithm(mesh, params, (length(d)-1)/2);
 
 %% Results 
 figure('Name','Cube 3D mesh','NumberTitle','off')
@@ -102,7 +99,7 @@ function [AdjMat] = adjency_matrix(T)
 end
 
 % A^* algorithm  to obtain the needed space factor 
-function [path, cost, source, destination] = Astar_algorithm(mesh, params)
+function [path, cost, source, destination] = Astar_algorithm(mesh, params, l)
     % Generate the graph and the nodes lists
     source = randi([1 size(mesh.Points,1)]);
     destination = randi([1 size(mesh.Points,1)]);
@@ -157,10 +154,10 @@ function [path, cost, source, destination] = Astar_algorithm(mesh, params)
     
                 if (~close_node)
                     % Directivity cost
-                    children.H = sum(abs(mesh.Points(destination,:)-adjecentPoints(i,:)));
+                    children.H = cube_distance(mesh.Points(destination,:), adjecentPoints(i,:), l);
 
                     % Length of the wire cost
-                    children.G = current_cost + sum(abs(adjecentPoints(i,:)-mesh.Points(current,:)));
+                    children.G = current_cost + cube_distance(adjecentPoints(i,:), mesh.Points(current,:), l);
 
                     % Total cost
                     children.F = children.G + children.H;
@@ -197,13 +194,27 @@ function [d, P3, P4] = cube_distance(P1, P2, L)
     % Check if they are on the same face computing how many components are different
     index(1,:) = abs(P1) == L;
     index(2,:) = abs(P2) == L;
-    
+
     I = eye(3);
-    N(:,1) = sign(P1(index(1,:)))*I(:,index(1,:));
-    N(:,2) = sign(P2(index(2,:)))*I(:,index(2,:));
+
+    % Handle edge points
+    if (sum(index(1,:)) > 1)
+        a = find(index(1,:) == 1); 
+        index(1,:) = false(1,3); 
+        index(1,a(1)) = true;
+    end
+
+    if (sum(index(2,:)) > 1)
+        a = find(index(2,:) == 1); 
+        index(2,:) = false(1,3); 
+        index(2,a(1)) = true;
+    end
+
+    N(:,1) = sign(P1(index(1,:)).').*I(:,index(1,:));
+    N(:,2) = sign(P2(index(2,:)).').*I(:,index(2,:));
 
     if ((dot(N(:,1),N(:,2)) == 0) || (dot(N(:,1),N(:,2)) == -1))
-        % Compute the intersection between the edges and the unfolding point
+        % Compute the intersection between the edges and the unfolding points
         plane = (abs(P1) ~= L);
 
         P3 = repmat(P1,1,4);
@@ -217,22 +228,43 @@ function [d, P3, P4] = cube_distance(P1, P2, L)
         end
 
         % Check if the edge shares surface with the destination
-        new_index = abs(P3(plane,:)) == L;
+        new_index = zeros(1,size(P3,2)); 
 
-        if (any(index(3,:) == index(2,:)))
-            d = sum(abs(P2-P3(:,index(3,:) == index(2,:))));
+        for i = 1:size(P3,2)
+            Paux = P3(:,i);
+            index(3,:) = abs(Paux) == L;
+
+            Naux = sign(Paux(index(3,:)).').*I(:,index(3,:));
+            if (size(Naux,2) ~= 3)
+                Naux = [Naux zeros(3,1)];
+            end
+
+
+            if all(Naux(:,1) == Naux(:,2)) || all(Naux(:,2) == N(:,2)) || all(Naux(:,3) == N(:,2))
+                new_index(i) = 1; 
+            else
+                new_index(i) = 0; 
+            end
+        end
+
+        new_index = logical(new_index);
+
+        if (any(new_index))
+            P4 = P3(:,new_index);
+            d = sum(abs(P2-P4)) + sum(abs(P4-P1));
+            d = min(d);
         else
+            d = zeros(1,size(P3,2));
             P4 = P3; 
             P4(~plane,:) = P4(~plane,:)-sign(P4(~plane,:))*1;
 
-            dmin = zeros(1,size(P3,2)); 
-            for i = 1:size(P3,2)
-                dmin(i) = 1 +sum(abs(P3(:,i)-P1)); 
+            for i = 1:length(d)
+                d(i) = sum(abs(P4(:,i)-P3(:,i))) + cube_distance(P4(:,i), P2, L) + sum(abs(P3(:,i)-P1));
             end
 
-            [dmin, index] = min(dmin);
+            [d, index] = sort(d);
             P4 = P4(:,index(1));
-            d = dmin + cube_distance(P4(:,index(1)), P2, L);
+            d = d(1);
         end
     else
         d = sum(abs(P2-P1));        % Taxicab distance betweeen two points on the same surface
