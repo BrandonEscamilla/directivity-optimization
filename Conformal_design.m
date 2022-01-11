@@ -3,6 +3,8 @@
 
 %% This file introduces an optimization problem to design a conformal antenna array form by up to 12 radiative elements 
 
+set_graphics();
+
 %% Initial conditions and constants
 % Generate the cube mesh
 d = -2:2;
