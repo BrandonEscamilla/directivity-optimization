@@ -13,10 +13,6 @@ x = X(:);
 y = Y(:);
 z = Z(:);
 
-P1 = [-2 0 0].'; 
-P2 = [-2 2 2].';
-[D, P3, P4] = cube_distance(P1, P2, (length(d)-1)/2);
-
 % Delaunay triangulation
 DT = delaunayTriangulation(x,y,z);
 [Tfb, Xfb] = freeBoundary(DT);
@@ -32,10 +28,6 @@ view(3)
 hold on 
 trisurf(T,'FaceColor',[0.8 0.8 1.0]);
 alpha(0.1)
-scatter3(P1(1), P1(2), P1(3), 'b', 'filled');
-scatter3(P2(1), P2(2), P2(3), 'r', 'filled');
-scatter3(P3(1,:), P3(2,:), P3(3,:), 'k', 'filled');
-scatter3(P4(1,:), P4(2,:), P4(3,:), 'm', 'filled');
 hold off
 xlabel('x','FontSize',13);
 ylabel('y','FontSize',13);
@@ -45,19 +37,14 @@ title('Cube 3D mesh','FontSize',13)
 %% Optimization problem
 % Design constraints 
 L = 400;                % Total length of the wire 
-dphi = pi/2;            % Directivity pulse center 
-W = 1;                  % Width of the pulse 
-method = 'fmincon';     % Solver to be used
-
-num_nodes = 50;         % Number of nodes to optimize 
-gamma = sqrt(2);        % Characteristic tesselation length
-tol = 1;      % Continuity tolerance   
 
 % Optimization design variables
-params = [L dphi W tol];    
+I = 1; 
+lambda = 3e8/20e9;
+params = [L I lambda];    
 
 % Optimization 
-[wire, cost, source, destination] = Astar_algorithm(mesh, params, (length(d)-1)/2);
+[wire, Phi, dPhi] = antenna_synthesis(mesh, params);
 
 %% Results 
 figure('Name','Cube 3D mesh','NumberTitle','off')
@@ -65,13 +52,11 @@ view(3)
 hold on 
 trisurf(T,'FaceColor',[0.8 0.8 1.0]);
 alpha(0.1)
-scatter3(source(1), source(2), source(3), 'k', 'filled')
-%scatter3(wire(2:end,1), wire(2:end,2), wire(2:end,3), 'b','filled')
+scatter3(wire(2:end,1), wire(2:end,2), wire(2:end,3), 'b','filled')
 scatter(P1(1), P1(2), P1(3));
 scatter(P2(1), P2(2), P2(3));
 scatter(P3(1,:), P3(2,:), P3(3,:));
 scatter(P4(1,:), P4(2,:), P4(3,:));
-scatter3(destination(1), destination(2), destination(3), 'r','filled')
 hold off
 xlabel('x','FontSize',13);
 ylabel('y','FontSize',13);
@@ -100,84 +85,116 @@ function [AdjMat] = adjency_matrix(T)
     end
 end
 
-% A^* algorithm  to obtain the needed space factor 
-function [path, cost, source, destination] = Astar_algorithm(mesh, params, l)
-    % Generate the graph and the nodes lists
-    source = randi([1 size(mesh.Points,1)]);
-    destination = randi([1 size(mesh.Points,1)]);
-    close_list.ID = [];
-    close_list.Cost = [];
-    close_list.G = [];
-    path.ID = [];
-    path.Cost = [];
+% Function to optimize the problem 
+function [wire, Phi, dPhi] = antenna_synthesis(mesh, params)
+    % Linear constraints
+    A = []; 
+    b = []; 
+    Aeq = []; 
+    beq = [];
+    
+    % Upper and lower bounds
+    lb = [1 0 0];                         % Lower bound for the initial point x coordinate
+    ub = [size(mesh.Points,1) 0.1 10];    % Upper bound for the initial point y coordinate
 
-    % Initial cost estimation
-    open_list.ID = source;
-    open_list.Cost = Inf*ones(1,length(open_list)); 
-    open_list.Cost(1) = 0;
-    open_list.G = Inf;
+    % Optimization options 
+    options = optimset('Display', 'off');
+
+    % Initial guess optimization
+    nvars = 3; 
+
+    % Integer constraints (to be on the cube mesh)
+    intlcon = 1; 
+
+    % Nonlinear constraints 
+    nonlcon = [];
+
+    % Design the wire and obtain its performance
+    wire = ga(@(vars)costfunc(mesh, params, vars), nvars, A, b, Aeq, beq, lb, ub, nonlcon, intlcon, options); 
+    dPhi = wire(end-1);
+    [wire, Phi] = wirebredth(mesh, wire(1), params, wire(end), phi, theta);
+end
+
+% Cost function 
+function [cost] = costfunc(mesh, params, vars)
+    % Constants 
+    L = params(1); 
+    
+    % Angle domain 
+    phi = 0:1e-2:pi; 
+    theta = -pi/2:1e-2:pi/2; 
+
+    % Objective function (pseudo unit step radiation pattern)
+    dTheta = vars(end);
+    F = pseudostep(theta, pi/2, dTheta);
+
+    % Generate the wire and assess its performance  
+    [r, f] = wirebredth(mesh, vars(1), params, vars(end), phi, theta, F);
+
+    % Cost function
+    cost = sqrt(sum(dot(f-F,f-F,2))/length(theta));
+    s = darclength(r);
+    cost = cost+(s-L);
+end
+
+% Heuristic search of the desired wire
+function [wire, Phi] = wirebredth(mesh, source_index, params, k, phi, theta, F)
+    % Generate the graph and the nodes lists
+    open_list.ID = 1:size(mesh.Points,1);
+    close_list.ID = [];
+    path.ID = [];
+    path.Points = [];
+    path.Cost = []; 
+
+    current = source_index; 
 
     % Set up the optimization loop
     GoOn = true;                         % Convergence flag 
 
+    % Constants 
+    tol = 1e-3; 
+
     % Explore the complete connectivity matrix of the source 
     while (GoOn)
-        % Select the minimum cost node
-        [current_cost, index] = sort(open_list.Cost);         
-        current = open_list.ID(index(1));              % Current node
-        current_cost = current_cost(1);
-        current_G = open_list.G(index(1));
-
+        % Update the graph lists
         path.ID = [path.ID; current];
-        path.Cost = [path.Cost; current_cost];
-
-        % Delete it from the open list 
+        path.Points = mesh.Points(path.ID,:);
         open_list.ID = open_list.ID(open_list.ID ~= current);
-        open_list.Cost = open_list.Cost(open_list.ID ~= current);
-
-        % Add it to the close list
         close_list.ID = [close_list.ID; current];
-        close_list.Cost = [close_list.Cost; current_cost];
-        close_list.G = [close_list.G; current_G];
 
-        % Check the generated radiative pattern 
-        goal_flag = false; 
+        % Check the generated radiative pattern error
+        f = radiation_pattern(params, path.Points, k, phi, theta);
+        cost = sqrt(sum(dot(f(:,1)-F,f(:,1)-F,2))/length(theta));
+        path.Cost = [path.Cost; cost]; 
 
-        if (~goal_flag)
+        if (cost > tol)
             % Explore the connectivity matrix 
             adjecentNodes = mesh.AdjencyMatrix(current,:);
             adjecentNodes = find(adjecentNodes == 1);
             adjecentPoints = mesh.Points(adjecentNodes.',:); 
 
-            for i = 1:size(adjecentNodes,1)
+            f_cost = zeros(length(adjecentNodes));
+            for i = 1:size(adjecentNodes,2)
                 % Check if it has been closed already or if it hasn't been opened
-                children.ID = adjecentNodes(i);
-                close_node = any(close_list.ID == children.ID);
-    
+                close_node = any(close_list.ID == adjecentNodes(i));
+ 
+                % Directivity cost
                 if (~close_node)
-                    % Directivity cost
-                    children.H = cube_distance(mesh.Points(destination,:), adjecentPoints(i,:), l);
-
-                    % Length of the wire cost
-                    children.G = current_cost + cube_distance(adjecentPoints(i,:), mesh.Points(current,:), l);
-
-                    % Total cost
-                    children.F = children.G + children.H;
-    
-                    % Add it to the open list 
-                    open_node = any(open_list.ID == children.ID);
-                    cost_flag = all(children.G < close_list.G);
-                    if (~open_node && cost_flag)
-                        open_list.ID = [open_list.ID; children.ID];
-                        open_list.Cost = [open_list.Cost; children.F];
-                        open_list.G = [open_list.G; children.G];
-                    end
+                    f = radiation_pattern(params, [path.Points; adjecentPoints(i,:)], k, phi, theta);
+                    f_cost(i) = sqrt(sum(dot(f(:,1)-F,f(:,1)-F,2))/length(theta));
+                else
+                    f_cost(i) = Inf; 
                 end
             end
-    
+
+            % Select the minimum cost node
+            [~, index] = sort(f_cost);
+            current = adjecentNodes(index(1));
+
             % Convergence 
-            if (isempty(open_list.ID))
+            if (isempty(open_list.ID) || size(open_list.ID,1) < 10)
                 GoOn = false;
+                path.Cost = [path.Cost; cost]; 
             end
         else
             GoOn = false; 
@@ -185,13 +202,99 @@ function [path, cost, source, destination] = Astar_algorithm(mesh, params, l)
     end
 
     % Final output
-    cost = path.Cost;
-    path = mesh.Points(path.ID,:);
-    source = mesh.Points(source,:); 
-    destination = mesh.Points(destination,:);
+    Phi = radiation_pattern(params, path.Points, k, phi, theta);
+    wire = path.Points;
 end
 
-% Function to cube the taxicab distance between any two points on the cube's surface
+% Compute the radiation pattern through the electrical field
+function [Phi] = radiation_pattern(params, r, k, phi, theta)
+    % Constants 
+    I = params(end-1);
+    lambda = params(end);
+    beta = 2*pi/lambda; 
+
+    % Preallocation 
+    Phi = zeros(length(theta), length(phi)); 
+
+    % Position computations 
+    s = darclength(r);
+    r = r(end,:);
+
+    % Main computation
+    for i = 1:length(theta)
+        for j = 1:length(phi)
+            % Compute the electric field
+            r = r/norm(r); 
+            u = [cos(phi(j))*sin(theta(i)); sin(phi(j))*sin(theta(i)); cos(theta(i))];
+            alpha = acos(dot(r,u));
+            Et = compound_trapz(s, electric_field(beta, k, alpha, s));
+            Et = Et*1i*60*pi*(I/lambda)*sin(alpha);
+
+            % Compute the radiation pattern 
+            Phi(i,j) = (1/(240*pi))*Et.*conj(Et);
+        end
+    end
+end
+
+% Compute the integral of the electric field
+function [S] = electric_field(beta, k, alpha, s)
+    S = exp(1i*(beta*cos(alpha)-k)*s);
+end
+
+% Compute the discrete arc length of a 3D-curve 
+function [s] = darclength(r)
+    % Preallocation of the arclength 
+    si = zeros(size(r,1)-1,1); 
+
+    % Compute the point-wise arclength 
+    for i = 2:size(r,1)-1
+        si(i) = norm(r(i,:)-r(i-1,:));
+    end
+
+    % Compute the accumulated arclength
+    s = si;
+    for i = 1:size(si,1)
+        s(i) = sum(si(1:i)); 
+    end
+
+    if (isempty(s))
+        s = 0; 
+    end
+end
+
+% Compute the integral of a given function using the compound trapezoidal rule
+function [I] = compound_trapz(s, func)
+    % Constants 
+    N = length(s);              % Number of intervals to analise
+
+    % Compound trapezoidal rule
+    fi = func; 
+
+    % Complete integral 
+    I = (fi(1)+fi(end))/2 + sum(fi(2:end-1));
+    I = (s(end)-s(1))/N*I;
+end
+
+% Function to fake a step function continuously 
+function [u] = pseudostep(phi, dphi, W)
+    % Constants
+    delta = 1e6;        % Saturation exponent 
+    tol = 1e-4;         % Resolution tolerance
+
+    % Preallocation of the step 
+    u = zeros(length(phi),1); 
+
+    % Compute the step of width W center at dphi as sigmoid function 
+    for i = 1:length(phi)
+        if (phi(i)-(dphi-W) > tol) && (phi(i)-(dphi+W) < tol)
+            u(i) = 1/(1+exp(-delta*(dphi+W-phi(i))));
+        end
+    end
+end
+
+% Function to cube the taxicab distance between any two points on the
+% cube's surface. Not working completely. DANGER: recursive functions in
+% here!
 function [d, P3, P4] = cube_distance(P1, P2, L)
     % Check if they are on the same face computing how many components are different
     index(1,:) = abs(P1) == L;
@@ -275,137 +378,6 @@ function [d, P3, P4] = cube_distance(P1, P2, L)
     end
 end
 
-% Function to optimize the problem 
-function [wire, A, S, dP, psi] = conformalOptimization(mesh, gamma, num_nodes, params, method)
-    % Sanity check on the number of nodes 
-    L = params(1); 
-    if (num_nodes*gamma > L)
-        num_nodes = L/gamma;
-    end
-
-    % Branch the different solver methods 
-    switch (method)
-        case 'fmincon'
-            % Linear constraints
-            A = []; 
-            b = []; 
-            Aeq = []; 
-            beq = [];
-            
-            % Upper and lower bounds
-            lb = 1*ones(1,num_nodes);                       % Lower bound for the mesh indices
-            ub = size(mesh.Points,1)*ones(1,num_nodes);     % Upper bound for the mesh indices
-
-            % Optimization options 
-            options = optimset('Display', 'on');
-
-            % Initial guess
-            sol0 = 1:num_nodes; 
-
-            % Design the wire
-            wire = fmincon(@(index)costfunc(mesh, params, index), sol0, A, b, Aeq, beq, lb, ub, @(index)nonlcon(mesh, params, index), options); 
-            wire = mesh.Points(round(wire),:);
-
-        otherwise
-            error('No valid solver was selected')
-    end
-
-    % Output 
-    dP = 1; 
-    psi = zeros(1,100); 
-    A = 1; 
-    S = 1; 
-end
-
-% Cost function 
-function [cost] = costfunc(mesh, params, index)
-    % Constants
-    L = params(1);          % Total length of the wire
-
-    % Points in the mesh 
-    r = mesh.Points(round(index),:);
-
-    % Cost function
-    cost = darclength(r);
-    cost = cost(end)-L;
-end
-
-% Nonlinear constraints
-function [c, ceq] = nonlcon(mesh, params, index)    
-    % Points in the mesh 
-    r = mesh.Points(round(index),:);
-
-    % Constants
-    tol = params(end);      % Continuity constraint tolerance 
-    L = params(1);          % Total length of the wire
-    
-    % Continuity analysis 
-    error = zeros(1,length(index));
-    
-    for i = 1:length(index)-1
-        error(i) = norm(r(i+1,:)-r(i,:))-tol;
-    end
-
-    % Total length constraint 
-    s = darclength(r);
-    error(end) = s(end)-L;
-
-    % Nonlinear constraints
-    ceq = [];                   % Equality constraint
-    c = error;                  % Inequality constraint
-end
-
-% Compute the discrete arc length of a 3D-curve 
-function [s] = darclength(r)
-    % Preallocation of the arclength 
-    si = zeros(size(r,1)-1,1); 
-
-    % Compute the point-wise arclength 
-    for i = 2:size(r,1)-1
-        si(i) = norm(r(i,:)-r(i-1,:));
-    end
-
-    % Compute the accumulated arclength
-    s = si;
-    for i = 1:size(si,1)
-        s(i) = sum(si(1:i)); 
-    end
-end
-
-% Compute the integral of a given function using the compound trapezoidal rule
-function [I] = compound_trapz(s, func)
-    % Constants 
-    N = length(s);              % Number of intervals to analise
-
-    % Compound trapezoidal rule
-    fi = zeros(1,length(s));    % Preallocation of the internal values
-
-    for i = 1:length(s)
-        fi = func(s);
-    end
-
-    % Complete integral 
-    I = (fi(1)+fi(end))/2 + sum(fi(2:end-1));
-    I = (s(end)-s(1))/N*I;
-end
-
-% Function to fake a step function continuously 
-function [u] = pseudostep(phi, dphi, W)
-    % Constants
-    delta = 1e6;        % Saturation exponent 
-    tol = 1e-4;         % Resolution tolerance
-
-    % Preallocation of the step 
-    u = zeros(length(phi),1); 
-
-    % Compute the step of width W center at dphi as sigmoid function 
-    for i = 1:length(phi)
-        if (phi(i)-(dphi-W) > tol) && (phi(i)-(dphi+W) < tol)
-            u(i) = 1/(1+exp(-delta*(dphi+W-phi(i))));
-        end
-    end
-end
-
 % Data regression using Chebyshev polynomials of the first kind
 function [cn, W] = chebyshev_coefficients(x, y, order)
     %Sanity check on the data dimensions
@@ -456,39 +428,20 @@ function [Pn] = chebyshev(kind, order, u)
     end
 end
 
-
-%% Directive radiation functions 
-
-% Radiative pattern for a single radiative element 
-function [phi] = radiative_element(A, ds, r)
-    % Compute the direction angle between the given direction and the current element 
-    alpha = acos(dot(ds, r)); 
-
-    % Compute the radiative intensity 
-    phi = 15*pi*A^2*sin(alpha)^2;
-end
-
-% Space factor of a rectangular array 
-function [S] = sf_recarray(a, b, I, lambda, theta, phi)
-    F = sin(pi*a/lambda*sin(theta)*cos(phi))^2;
-    F = F*sin(pi*b/lambda*sin(theta)*cos(phi))^2;
-    F = F/(pi*a/lambda*sin(theta)*cos(phi))^2;
-    F = F/(pi*a/lambda*sin(theta)*cos(phi))^2;
-    S = (15*pi*a^2*I^2/lambda^2)*F*(1-sin(theta)^2*cos(phi)^2);
-end
-
-% Space factor of a given array 
-function [S] = space_factor(A, ds, phi)
-    % Compute the space factor 
-    F = 1;
-    
-    for i = 1:size(ds,2)
-        theta = 0;                              % Compute the angle between the two elements
-        L = norm(ds(:,1)-ds(:,i));              % Distance between the two elements
-        eps = 2*pi*L*cos(phi);                  % Interference angle
-        F = F + A(i)*exp(1i*(i*eps+theta));     % Space factor 
-    end
-
-    % Final space factor
-    S = sqrt(F*conj(F));
+% Some cool graphics setup
+function set_graphics()
+    %Set graphical properties
+    set(groot, 'defaultAxesTickLabelInterpreter', 'latex'); 
+    set(groot, 'defaultAxesFontSize', 11); 
+    set(groot, 'defaultAxesGridAlpha', 0.3); 
+    set(groot, 'defaultAxesLineWidth', 0.75);
+    set(groot, 'defaultAxesXMinorTick', 'on');
+    set(groot, 'defaultAxesYMinorTick', 'on');
+    set(groot, 'defaultFigureRenderer', 'painters');
+    set(groot, 'defaultLegendBox', 'off');
+    set(groot, 'defaultLegendInterpreter', 'latex');
+    set(groot, 'defaultLegendLocation', 'best');
+    set(groot, 'defaultLineLineWidth', 1); 
+    set(groot, 'defaultLineMarkerSize', 3);
+    set(groot, 'defaultTextInterpreter','latex');
 end

@@ -38,8 +38,9 @@ polarplot(alpha, sqrt(Phi))
 title('Radiation pattern for ZX wire, Z current')
 
 % Straigth wire in the ZX plane, current parallel to the X direction (+)
+phi = 0:1e-2:pi; 
 Phi = 30*pi*I^2/lambda^2*((1-cos(beta*cos(theta)-k)*l)./(beta*cos(theta)-k).^2).*(cos(theta)).^2;
-alpha = theta;
+alpha = acos(sin(theta).*sin(phi));
 
 figure
 polarplot(alpha, sqrt(Phi))
@@ -50,7 +51,8 @@ title('Radiation pattern for ZX wire, X current')
 theta = -pi/2:1e-2:pi/2;
 
 % Radiation pattern for a ZY rectangular array, current parallel to the + Y direction
-phi = -pi/2:1e-2:pi/2; 
+phi = pi/2:1e-2:3*pi/2; 
+phi = flip(phi);
 F = sin(pi*a/lambda*sin(theta).*cos(phi)).^2;
 F = F.*sin(pi*b/lambda*cos(theta)).^2;
 F = F./(pi*a/lambda*sin(theta).*cos(phi)).^2;
@@ -58,7 +60,7 @@ F = F./(pi*b/lambda*cos(theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(phi).^2);
 alpha = acos(sin(theta).*cos(phi));
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -74,7 +76,7 @@ F = F./(pi*b/lambda*cos(theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(pi/2-phi).^2);
 alpha = acos(sin(theta).*cos(pi/2-phi));
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -90,7 +92,7 @@ F = F./(pi*b/lambda*cos(theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(theta).^2);
 alpha = theta;
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -106,7 +108,7 @@ F = F./(pi*b/lambda*cos(-theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(-theta).^2);
 alpha = theta;
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -126,7 +128,7 @@ F = F./(pi*b/lambda*cos(theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*sin(phi).^2);
 alpha = acos(sin(theta).*sin(phi));
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -147,7 +149,7 @@ F = F./(pi*b/lambda*cos(theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*sin(pi/2-phi).^2);
 alpha = acos(sin(theta).*sin(pi/2-phi));
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -163,7 +165,7 @@ F = F./(pi*b/lambda*cos(theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(theta).^2);
 alpha = theta;
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -179,7 +181,7 @@ F = F./(pi*b/lambda*cos(-theta)).^2;
 Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(-theta).^2);
 alpha = theta;
 Phi_xz = [Phi_xz Phi_xz];
-alpha = [-flip(alpha) alpha];
+alpha = [flip(alpha) alpha];
 
 figure
 polarplot(alpha, sqrt(Phi_xz))
@@ -198,7 +200,7 @@ phi = -pi/2:1e-2:pi/2;
 Phi_yz = 4*sin(pi*l/lambda*sin(theta).*sin(phi)).^2.*Phi_yz;
 
 figure 
-polar(alpha, sqrt(Phi_xz))
+polarplot(alpha, sqrt(Phi_xz))
 title('Radiation pattern')
 grid on;
 
