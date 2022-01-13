@@ -7,7 +7,7 @@ set_graphics();
 
 %% Initial conditions and constants
 % Generate the cube mesh
-d = -2:2;
+d = -3:3;
 [X, Y, Z] = meshgrid(d);
 x = X(:);
 y = Y(:);
@@ -19,7 +19,7 @@ DT = delaunayTriangulation(x,y,z);
 T = triangulation(Tfb, Xfb);
 
 % Calculate adjacency matrix
-mesh.AdjencyMatrix = adjency_matrix(T);
+%mesh.AdjencyMatrix = adjency_matrix(T);
 mesh.Points = T.Points;
 mesh.ConnectivityList = T.ConnectivityList;
 

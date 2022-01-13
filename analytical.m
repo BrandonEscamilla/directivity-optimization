@@ -230,6 +230,57 @@ plot(theta, I)
 title('Required antenna synthesis PSD')
 grid on; 
 
+%% Optimization of a rectangular array with finite numer of elements 
+% Objective function 
+theta = -pi/2:1e-2:pi/2; 
+phi = 0:1e-2:pi; 
+f = pseudostep(theta, pi/2, 0.2);
+
+% Linear constraints
+A = []; 
+c = [];
+Aeq = []; 
+beq = [];
+
+% Upper and lower bounds
+lb = [1e-3 1e-3 2 2];      % Lower bound for the initial point x coordinate
+ub = [a b 100 100];        % Upper bound for the initial point y coordinate
+
+% Optimization options 
+options = optimset('Display', 'off');
+
+% Initial guess optimization
+nvars = 4; 
+
+% Integer constraints (to be on the cube mesh)
+intlcon = [3,4]; 
+
+% Nonlinear constraints 
+nonlcon = [];
+
+% Design the wire and obtain its performance
+array = ga(@(array)costfunc(lambda, I, f, theta, phi, array), nvars, A, c, Aeq, beq, lb, ub, nonlcon, intlcon, options); 
+
+% Array performance
+a = array(1); 
+b = array(2); 
+n = array(3); 
+m = array(4); 
+
+phi = pi/2:1e-2:3*pi/2; 
+phi = flip(phi);
+F = sin(pi*a/(lambda*(1-1/m))*sin(theta).*cos(phi)).^2;
+F = F.*sin(pi*b/(lambda*(1-1/n))*cos(theta)).^2;
+F = F./(pi*a/((m-1)*lambda)*sin(theta).*cos(phi)).^2;
+F = F./(pi*b/((n-1)*lambda)*cos(theta)).^2;
+Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(phi).^2);
+alpha = acos(sin(theta).*cos(phi));
+Phi_xz = [Phi_xz Phi_xz];
+alpha = [flip(alpha) alpha];
+
+figure
+polarplot(alpha, Phi_xz)
+
 %% Auxiliary functions
 % Function to fake a step function continuously 
 function [u] = pseudostep(phi, dphi, W)
@@ -246,6 +297,26 @@ function [u] = pseudostep(phi, dphi, W)
             u(i) = 1/(1+exp(-delta*(dphi+W-phi(i))));
         end
     end
+end
+
+% Optimization cost function 
+function [residual] = costfunc(lambda, I, U, theta, phi, array)
+    % Array constants
+    a = array(1); 
+    b = array(2); 
+    n = array(3); 
+    m = array(4); 
+
+    % Array radiation pattern
+    F = sin(pi*a/(lambda*(1-1/m))*sin(theta).*cos(phi)).^2;
+    F = F.*sin(pi*b/(lambda*(1-1/n))*cos(theta)).^2;
+    F = F./(pi*a/((m-1)*lambda)*sin(theta).*cos(phi)).^2;
+    F = F./(pi*b/((n-1)*lambda)*cos(theta)).^2;
+    Phi = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(phi).^2);
+    f = sqrt(Phi);
+
+    % Compute the residual
+    residual = sqrt(sum(dot(f-U,f-U,2))/length(theta));
 end
 
 % Some cool graphics setup
