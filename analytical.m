@@ -25,215 +25,188 @@ D = a/lambda;                   % Continuity is needed
 
 %% Single wire/continuous current distribution (monopole)
 % Straigth wire in the ZX/ZY plane (symmetry), current parallel to the Z direction (+)
-theta = -pi/2:1e-2:pi/2;
+theta = 0:1e-2:pi;
 beta = 2*pi*b/lambda;
 K = 0.999;
 k = cos(pi/2*K)*beta; 
 
 Phi = 30*pi*I^2/lambda^2*((1-cos(beta*cos(theta)-k)*l)./(beta*cos(theta)-k).^2).*(sin(theta)).^2;
-alpha = theta;
+Phi = 2*Phi; 
 
 figure
-polarplot(alpha, sqrt(Phi))
+polarplot(theta, sqrt(Phi))
 title('Radiation pattern for ZX wire, Z current')
 
-% Straigth wire in the ZX plane, current parallel to the X direction (+)
-phi = 0:1e-2:pi; 
-Phi = 30*pi*I^2/lambda^2*((1-cos(beta*cos(theta)-k)*l)./(beta*cos(theta)-k).^2).*(cos(theta)).^2;
-alpha = acos(sin(theta).*sin(phi));
-
 figure
-polarplot(alpha, sqrt(Phi))
-title('Radiation pattern for ZX wire, X current')
+plot(theta, sqrt(Phi))
+title('Radiation pattern for ZX wire, Z current')
 
 %% Rectangular array in the ZX planes
-% Angular domain
-theta = -pi/2:1e-2:pi/2;
+% Radiation pattern for a ZX rectangular array, current parallel to the - X direction
+phi = 0:1e-2:pi; 
 
-% Radiation pattern for a ZY rectangular array, current parallel to the + Y direction
-phi = pi/2:1e-2:3*pi/2; 
-phi = flip(phi);
-F = sin(pi*a/lambda*sin(theta).*cos(phi)).^2;
-F = F.*sin(pi*b/lambda*cos(theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*cos(phi)).^2;
-F = F./(pi*b/lambda*cos(theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(phi).^2);
-alpha = acos(sin(theta).*cos(phi));
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
+% Preallocation 
+Phi = zeros(length(theta), length(phi));
+for i = 1:length(theta)
+    for j = 1:length(phi)
+        F = sin(pi*a/lambda*sin(theta(i))*cos(-phi(j)))^2;
+        F = F*sin(pi*b/lambda*cos(theta(i)))^2;
+        F = F/(pi*a/lambda*sin(theta(i))*cos(-phi(j)))^2;
+        F = F/(pi*b/lambda*cos(theta(i)))^2;
+        Phi(i,j) = (15*pi*a^2*I^2/lambda^2)*F*(1-sin(theta(i))^2*cos(-phi(j))^2);
+        M = [rad2deg(theta(i)) rad2deg(phi(j)) Phi(i,j)];
+    end
+end
 
+Phi = 2*Phi;
+Phi = Phi(2:end,2:end);
+theta = theta(2:end);
+
+% Results 
 figure
-polarplot(alpha, sqrt(Phi_xz))
+polarplot(theta, sqrt(Phi(:,end)))
+
+figure 
+plot(theta, sqrt(Phi(:,end)))
 title('Radiation pattern of a ZY rectangular array, +Y direction')
 grid on;
 
-% Radiation pattern for a ZY rectangular array, current parallel to the -Y direction
-phi = 0:1e-2:pi; 
-F = sin(pi*a/lambda*sin(theta).*cos(pi/2-phi)).^2;
-F = F.*sin(pi*b/lambda*cos(theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*cos(pi/2-phi)).^2;
-F = F./(pi*b/lambda*cos(theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(pi/2-phi).^2);
-alpha = acos(sin(theta).*cos(pi/2-phi));
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
+% Radiation pattern for a ZX rectangular array, current parallel to the + X direction
+Phi = zeros(length(theta), length(phi));
+for i = 1:length(theta)
+    for j = 1:length(phi)
+        F = sin(pi*a/lambda*sin(theta(i))*cos(phi(j)))^2;
+        F = F*sin(pi*b/lambda*cos(theta(i)))^2;
+        F = F/(pi*a/lambda*sin(theta(i))*cos(phi(j)))^2;
+        F = F/(pi*b/lambda*cos(theta(i)))^2;
+        Phi(i,j) = (15*pi*a^2*I^2/lambda^2)*F*(1-sin(theta(i))^2*cos(phi(j))^2);
+        M = [rad2deg(theta(i)) rad2deg(phi(j)) Phi(i,j)];
+    end
+end
 
 figure
-polarplot(alpha, sqrt(Phi_xz))
+polarplot(theta, sqrt(Phi(:,end)))
+title('Radiation pattern of a ZX rectangular array, -X direction')
+
+figure
+plot(theta, sqrt(Phi(:,end)))
 title('Radiation pattern of a ZX rectangular array, -X direction')
 grid on;
 
+%% Radiation pattern for a ZX rectangular array, current parallel to the Z direction
 % Radiation pattern for a ZX rectangular array, current parallel to the Z direction
 phi = 0:1e-2:pi; 
-F = sin(pi*a/lambda*sin(theta).*cos(phi)).^2;
-F = F.*sin(pi*b/lambda*cos(theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*cos(phi)).^2;
-F = F./(pi*b/lambda*cos(theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(theta).^2);
-alpha = theta;
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
 
+% Preallocation 
+Phi = zeros(length(theta), length(phi));
+for i = 1:length(theta)
+    for j = 1:length(phi)
+        F = sin(pi*a/lambda*sin(theta(i))*cos(phi(j)))^2;
+        F = F*sin(pi*b/lambda*cos(theta(i)))^2;
+        F = F/(pi*a/lambda*sin(theta(i))*cos(phi(j)))^2;
+        F = F/(pi*b/lambda*cos(theta(i)))^2;
+        Phi(i,j) = (15*pi*a^2*I^2/lambda^2*F*cos(theta(i))^2);
+        M = [rad2deg(theta(i)) rad2deg(phi(j)) Phi(i,j)];
+    end
+end
+
+Phi = 2*Phi;
+Phi = Phi(2:end,2:end);
+theta = theta(2:end);
+
+% Results 
 figure
-polarplot(alpha, sqrt(Phi_xz))
-title('Radiation pattern of a ZX rectangular array, +Z direction')
-grid on;
+polarplot(theta, sqrt(Phi(:,end)))
 
-% Radiation pattern for a ZX rectangular array, current parallel to the -Z direction
-phi = 0:1e-2:pi; 
-F = sin(pi*a/lambda*sin(theta).*cos(phi)).^2;
-F = F.*sin(pi*b/lambda*cos(-theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*cos(phi)).^2;
-F = F./(pi*b/lambda*cos(-theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(-theta).^2);
-alpha = theta;
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
-
-figure
-polarplot(alpha, sqrt(Phi_xz))
-title('Radiation pattern of a ZX rectangular array, +Z direction')
+figure 
+plot(theta, sqrt(Phi(:,end)))
+title('Radiation pattern of a ZY rectangular array, +Y direction')
 grid on;
 
 %% Rectangular array in the ZY planes
-% Angular domain
-theta = -pi/2:1e-2:pi/2;
+% ZY plane, Z direction
+% Preallocation 
+Phi = zeros(length(theta), length(phi));
+for i = 1:length(theta)
+    for j = 1:length(phi)
+        F = sin(pi*a/lambda*sin(theta(i))*sin(phi(j)))^2;
+        F = F*sin(pi*b/lambda*cos(theta(i)))^2;
+        F = F/(pi*a/lambda*sin(theta(i))*sin(phi(j)))^2;
+        F = F/(pi*b/lambda*cos(theta(i)))^2;
+        Phi(i,j) = (15*pi*a^2*I^2/lambda^2*F*cos(theta(i))^2);
+        M = [rad2deg(theta(i)) rad2deg(phi(j)) Phi(i,j)];
+    end
+end
 
-% Radiation pattern for a ZX rectangular array, current parallel to the + X direction
-phi = 0:1e-2:pi; 
-F = sin(pi*a/lambda*sin(theta).*sin(phi)).^2;
-F = F.*sin(pi*b/lambda*cos(theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*sin(phi)).^2;
-F = F./(pi*b/lambda*cos(theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*sin(phi).^2);
-alpha = acos(sin(theta).*sin(phi));
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
+Phi = 2*Phi;
+Phi = Phi(2:end,2:end);
+theta = theta(2:end);
 
+% Results 
 figure
-polarplot(alpha, sqrt(Phi_xz))
+polarplot(theta, sqrt(Phi(:,end)))
+
+figure 
+plot(theta, sqrt(Phi(:,end)))
+title('Radiation pattern of a ZY rectangular array, Z direction')
+grid on;
+
+
+% Radiation pattern for a ZY rectangular array, current parallel to the X direction
+% Preallocation 
+Phi = zeros(length(theta), length(phi));
+for i = 1:length(theta)
+    for j = 1:length(phi)
+        F = sin(pi*a/lambda*sin(theta(i))*sin(phi(j)))^2;
+        F = F*sin(pi*b/lambda*cos(theta(i)))^2;
+        F = F/(pi*a/lambda*sin(theta(i))*sin(phi(j)))^2;
+        F = F/(pi*b/lambda*cos(theta(i)))^2;
+        Phi(i,j) = (15*pi*a^2*I^2/lambda^2*F*(1-sin(theta(i))*cos(phi(j)))^2);
+        M = [rad2deg(theta(i)) rad2deg(phi(j)) Phi(i,j)];
+    end
+end
+
+Phi = 2*Phi;
+Phi = Phi(2:end,2:end);
+theta = theta(2:end);
+
+% Results 
+figure
+polarplot(theta, sqrt(Phi(:,end)))
+
+figure 
+plot(theta, sqrt(Phi(:,end)))
 title('Radiation pattern of a ZY rectangular array, +Y direction')
 grid on;
 
+% Preallocation 
+Phi = zeros(length(theta), length(phi));
+for i = 1:length(theta)
+    for j = 1:length(phi)
+        F = sin(pi*a/lambda*sin(theta(i))*sin(phi(j)))^2;
+        F = F*sin(pi*b/lambda*cos(theta(i)))^2;
+        F = F/(pi*a/lambda*sin(theta(i))*sin(phi(j)))^2;
+        F = F/(pi*b/lambda*cos(theta(i)))^2;
+        Phi(i,j) = (15*pi*a^2*I^2/lambda^2*F*(1-sin(theta(i))*sin(phi(j)))^2);
+        M = [rad2deg(theta(i)) rad2deg(phi(j)) Phi(i,j)];
+    end
+end
+
+Phi = 2*Phi;
+Phi = Phi(2:end,2:end);
+theta = theta(2:end);
+
+% Results 
+figure
+polarplot(theta, sqrt(Phi(:,end)))
+
 figure 
-plot(alpha, sqrt(Phi_xz))
+plot(theta, sqrt(Phi(:,end)))
 title('Radiation pattern of a ZY rectangular array, +Y direction')
-grid on; 
-
-% Radiation pattern for a ZY rectangular array, current parallel to the -Y direction
-phi = pi/2:1e-2:3*pi/2;
-F = sin(pi*a/lambda*sin(theta).*sin(pi/2-phi)).^2;
-F = F.*sin(pi*b/lambda*cos(theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*sin(pi/2-phi)).^2;
-F = F./(pi*b/lambda*cos(theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*sin(pi/2-phi).^2);
-alpha = acos(sin(theta).*sin(pi/2-phi));
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
-
-figure
-polarplot(alpha, sqrt(Phi_xz))
-title('Radiation pattern of a ZY rectangular array, -Y direction')
 grid on;
-
-% Radiation pattern for a ZX rectangular array, current parallel to the Z direction
-phi = pi/2:1e-2:3*pi/2; 
-F = sin(pi*a/lambda*sin(theta).*sin(phi)).^2;
-F = F.*sin(pi*b/lambda*cos(theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*sin(phi)).^2;
-F = F./(pi*b/lambda*cos(theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(theta).^2);
-alpha = theta;
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
-
-figure
-polarplot(alpha, sqrt(Phi_xz))
-title('Radiation pattern of a ZX rectangular array, +Z direction')
-grid on;
-
-% Radiation pattern for a ZX rectangular array, current parallel to the -Z direction
-phi = pi/2:1e-2:3*pi/2;  
-F = sin(pi*a/lambda*sin(theta).*sin(phi)).^2;
-F = F.*sin(pi*b/lambda*cos(-theta)).^2;
-F = F./(pi*a/lambda*sin(theta).*sin(phi)).^2;
-F = F./(pi*b/lambda*cos(-theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(cos(-theta).^2);
-alpha = theta;
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
-
-figure
-polarplot(alpha, sqrt(Phi_xz))
-title('Radiation pattern of a ZX rectangular array, +Z direction')
-grid on;
-
-%% Array of rectangular arrays in the XZ and ZY planes 
-% For the XZ plane 
-l = 0.1; 
-phi = 0:1e-2:pi; 
-Phi_xz = 4*sin(pi*l/lambda*sin(theta).*cos(phi)).^2.*Phi_xz;
-
-% For ZY planes 
-l = 0.1; 
-phi = -pi/2:1e-2:pi/2; 
-Phi_yz = 4*sin(pi*l/lambda*sin(theta).*sin(phi)).^2.*Phi_yz;
-
-figure 
-polarplot(alpha, sqrt(Phi_xz))
-title('Radiation pattern')
-grid on;
-
-figure
-polarplot(alpha, sqrt(Phi_yz))
-title('Radiation pattern')
-grid on;
-
-% It is therefore a better option to avoid interaction between opposite
-% surfaces, as directivity is lost. 
-
-%% Fourier transform approach. Array synthesis for a current distribution (wire) on a given surface
-% Generate the double sided frequency response 
-theta = -pi/2:1e-3:pi/2; 
-L = length(theta);
-
-f = pseudostep(theta, 0, 0.2);
-plot(theta,f)
-
-% The inverse transform is 
-I = ifft(f);
-I = I.*conj(I)/L;
-i = fft(I,L);
-
-figure
-plot(theta, I)
-title('Required antenna synthesis PSD')
-grid on; 
 
 %% Optimization of a rectangular array with finite numer of elements 
 % Objective function 
-theta = -pi/2:1e-2:pi/2; 
-phi = 0:1e-2:pi; 
 f = pseudostep(theta, pi/2, 0.2);
 
 % Linear constraints
@@ -262,24 +235,38 @@ nonlcon = [];
 array = ga(@(array)costfunc(lambda, I, f, theta, phi, array), nvars, A, c, Aeq, beq, lb, ub, nonlcon, intlcon, options); 
 
 % Array performance
-a = array(1); 
-b = array(2); 
+c = array(1); 
+d = array(2); 
 n = array(3); 
 m = array(4); 
 
-phi = pi/2:1e-2:3*pi/2; 
-phi = flip(phi);
-F = sin(pi*a/(lambda*(1-1/m))*sin(theta).*cos(phi)).^2;
-F = F.*sin(pi*b/(lambda*(1-1/n))*cos(theta)).^2;
-F = F./(pi*a/((m-1)*lambda)*sin(theta).*cos(phi)).^2;
-F = F./(pi*b/((n-1)*lambda)*cos(theta)).^2;
-Phi_xz = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(phi).^2);
-alpha = acos(sin(theta).*cos(phi));
-Phi_xz = [Phi_xz Phi_xz];
-alpha = [flip(alpha) alpha];
+for i = 1:length(theta)
+    for j = 1:length(phi)
+        F = sin(pi*a/(lambda*(1-1/m))*sin(theta(i))*sin(phi(j)))^2;
+        F = F*sin(pi*b/(lambda*(1-1/n))*cos(theta(i)))^2;
+        F = F/(pi*a/(lambda*(m-1))*sin(theta(i))*sin(phi(j)))^2;
+        F = F/(pi*b/(lambda*(1-1/n))*cos(theta(i)))^2;
+        Phi(i,j) = (15*pi*a^2*I^2/lambda^2*F*(1-sin(theta(i))*cos(phi(j)))^2);
+    end
+end
 
+Phi = 2*Phi; 
+
+% Plotting 
 figure
-polarplot(alpha, Phi_xz)
+polarplot(theta, sqrt(Phi(:,end)))
+
+figure 
+plot(theta, sqrt(Phi(:,end)))
+grid on; 
+
+% Gain and power radiated
+Phip = Phip(2:end,2:end);
+Phi_max = max(max(Phi));
+Phip = Phip/Phi_max; 
+P = Phi_max*trapz(theta(size(P(:,1),1)), Phip(:,end).*sin(theta(size(P(:,1),1))));
+P = trapz(phi,P);
+G = 4*pi/P;
 
 %% Auxiliary functions
 % Function to fake a step function continuously 
@@ -308,15 +295,24 @@ function [residual] = costfunc(lambda, I, U, theta, phi, array)
     m = array(4); 
 
     % Array radiation pattern
-    F = sin(pi*a/(lambda*(1-1/m))*sin(theta).*cos(phi)).^2;
-    F = F.*sin(pi*b/(lambda*(1-1/n))*cos(theta)).^2;
-    F = F./(pi*a/((m-1)*lambda)*sin(theta).*cos(phi)).^2;
-    F = F./(pi*b/((n-1)*lambda)*cos(theta)).^2;
-    Phi = (15*pi*a^2*I^2/lambda^2)*F.*(1-sin(theta).^2.*cos(phi).^2);
+    Phi = zeros(length(theta), length(phi));
+    for i = 1:length(theta)
+        for j = 1:length(phi)
+            F = sin(pi*a/(lambda*(1-1/m))*sin(theta(i))*sin(phi(j)))^2;
+            F = F*sin(pi*b/(lambda*(1-1/n))*cos(theta(i)))^2;
+            F = F/(pi*a/(lambda*(m-1))*sin(theta(i))*sin(phi(j)))^2;
+            F = F/(pi*b/(lambda*(1-1/n))*cos(theta(i)))^2;
+            Phi(i,j) = (15*pi*a^2*I^2/lambda^2*F*(1-sin(theta(i))*cos(phi(j)))^2);
+        end
+    end
+
     f = sqrt(Phi);
 
     % Compute the residual
-    residual = sqrt(sum(dot(f-U,f-U,2))/length(theta));
+    residual = 0; 
+    for i = 1:length(phi)
+        residual = residual + sqrt(sum(dot(f(:,i)-U,f(:,i)-U,2))/length(theta));
+    end
 end
 
 % Some cool graphics setup

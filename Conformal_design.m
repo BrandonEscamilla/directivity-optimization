@@ -7,7 +7,7 @@ set_graphics();
 
 %% Initial conditions and constants
 % Generate the cube mesh
-d = -3:3;
+d = -2:2;
 [X, Y, Z] = meshgrid(d);
 x = X(:);
 y = Y(:);
@@ -19,7 +19,7 @@ DT = delaunayTriangulation(x,y,z);
 T = triangulation(Tfb, Xfb);
 
 % Calculate adjacency matrix
-%mesh.AdjencyMatrix = adjency_matrix(T);
+mesh.AdjencyMatrix = adjency_matrix(T);
 mesh.Points = T.Points;
 mesh.ConnectivityList = T.ConnectivityList;
 
@@ -86,7 +86,7 @@ function [AdjMat] = adjency_matrix(T)
 end
 
 % Function to optimize the problem 
-function [wire, Phi, dPhi] = antenna_synthesis(mesh, params)
+function [wire, Phi, dPhi] = antenna_synthesis(mesh, params, phi)
     % Linear constraints
     A = []; 
     b = []; 
@@ -110,9 +110,15 @@ function [wire, Phi, dPhi] = antenna_synthesis(mesh, params)
     nonlcon = [];
 
     % Design the wire and obtain its performance
+    PopSize = 10;
+    MaxGenerations = 1; 
+    options = optimoptions(@ga,'PopulationSize', PopSize, 'MaxGenerations', MaxGenerations);
     wire = ga(@(vars)costfunc(mesh, params, vars), nvars, A, b, Aeq, beq, lb, ub, nonlcon, intlcon, options); 
     dPhi = wire(end-1);
-    [wire, Phi] = wirebredth(mesh, wire(1), params, wire(end), phi, theta);
+
+    theta = -pi/2:1e-2:pi/2; 
+    F = pseudostep(theta, pi/2, wire(end));
+    [wire, Phi] = wirebredth(mesh, wire(1), params, wire(end), phi, theta, F);
 end
 
 % Cost function 
